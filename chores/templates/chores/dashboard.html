@@ -1,17 +1,13 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Chore Rotation Dashboard</title>
-</head>
-<body>
+{% extends "chores/base.html" %}
+
+{% block content %}
   <h1>Chore Rotation Dashboard</h1>
 
   {% if rows is None %}
-    <p>No people or chores configured yet. Run <code>python manage.py seed_chores</code>.</p>
+    <p class="empty-state">No people or chores configured yet. Run <code>python manage.py seed_chores</code>.</p>
   {% else %}
-    <p>Week {{ week_index }}</p>
-    <table>
+    <p class="week-label">Week {{ week_index }}</p>
+    <table class="chore-table">
       <thead>
         <tr>
           <th>Chore</th>
@@ -22,18 +18,18 @@
       </thead>
       <tbody>
         {% for row in rows %}
-        <tr>
+        <tr class="{% if row.overdue %}overdue{% endif %}">
           <td>{{ row.chore.name }}</td>
           <td>{{ row.person.name }}</td>
           <td>
             <form method="post" action="{% url 'toggle-chore' row.chore.id %}">
               {% csrf_token %}
-              <input type="checkbox" {% if row.done %}checked{% endif %} onchange="this.form.submit()">
+              <input type="checkbox" class="done-checkbox" {% if row.done %}checked{% endif %} onchange="this.form.submit()">
             </form>
           </td>
           <td>
             {% if row.overdue %}
-              <span style="color: red; font-weight: bold;">OVERDUE</span>
+              <span class="overdue-flag">Overdue</span>
             {% endif %}
           </td>
         </tr>
@@ -41,5 +37,4 @@
       </tbody>
     </table>
   {% endif %}
-</body>
-</html>
+{% endblock %}
