@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Chore Rotation Dashboard</title>
+</head>
+<body>
+  <h1>Chore Rotation Dashboard</h1>
+
+  {% if rows is None %}
+    <p>No people or chores configured yet. Run <code>python manage.py seed_chores</code>.</p>
+  {% else %}
+    <p>Week {{ week_index }}</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Chore</th>
+          <th>Assigned to</th>
+          <th>Done</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td>{{ row.chore.name }}</td>
+          <td>{{ row.person.name }}</td>
+          <td><input type="checkbox" {% if row.done %}checked{% endif %} disabled></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</body>
+</html>
