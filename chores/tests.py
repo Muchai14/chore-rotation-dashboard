@@ -1,7 +1,9 @@
-from datetime import date
+from datetime import date, timedelta
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase, override_settings
+from django.urls import reverse
 
+from chores.models import Chore, ChoreCompletion, Person
 from chores.services import current_assignments, week_index
 
 PEOPLE = ["Alex", "Sam", "Jordan", "Taylor"]
@@ -68,3 +70,122 @@ class CurrentAssignmentsTests(SimpleTestCase):
     def test_raises_if_people_empty(self):
         with self.assertRaises(ValueError):
             current_assignments([], CHORES, START, START)
+
+
+class DashboardViewTests(TestCase):
+    def setUp(self):
+        self.people = [
+            Person.objects.create(name=name, order=i)
+            for i, name in enumerate(PEOPLE, start=1)
+        ]
+        self.chores = [
+            Chore.objects.create(name=name, order=i)
+            for i, name in enumerate(CHORES, start=1)
+        ]
+
+    def test_empty_state_when_nothing_seeded(self):
+        Person.objects.all().delete()
+        Chore.objects.all().delete()
+
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertIsNone(response.context["rows"])
+        self.assertContains(response, "No people or chores configured yet")
+
+    def test_shows_current_week_assignments_and_done_status(self):
+        start = date.today() - timedelta(weeks=2)
+        with override_settings(CHORE_ROTATION_START_DATE=start):
+            done_chore = self.chores[0]
+            ChoreCompletion.objects.create(chore=done_chore, week_index=2, done=True)
+
+            response = self.client.get(reverse("dashboard"))
+
+        self.assertEqual(response.context["week_index"], 2)
+        rows_by_chore = {row["chore"].name: row for row in response.context["rows"]}
+
+        self.assertTrue(rows_by_chore[done_chore.name]["done"])
+        other_chore_names = [c.name for c in self.chores if c != done_chore]
+        for name in other_chore_names:
+            self.assertFalse(rows_by_chore[name]["done"])
+
+        expected_assignments = {
+            chore.name: person.name
+            for chore, person in current_assignments(self.people, self.chores, start, date.today())
+        }
+        for name, row in rows_by_chore.items():
+            self.assertEqual(row["person"].name, expected_assignments[name])
+
+
+class OverdueFlaggingTests(TestCase):
+    def setUp(self):
+        self.people = [
+            Person.objects.create(name=name, order=i)
+            for i, name in enumerate(PEOPLE, start=1)
+        ]
+        self.chores = [
+            Chore.objects.create(name=name, order=i)
+            for i, name in enumerate(CHORES, start=1)
+        ]
+
+    def test_week_zero_is_never_overdue(self):
+        start = date.today()  # today falls in week 0; no previous week exists
+        with override_settings(CHORE_ROTATION_START_DATE=start):
+            response = self.client.get(reverse("dashboard"))
+
+        self.assertEqual(response.context["week_index"], 0)
+        self.assertTrue(all(not row["overdue"] for row in response.context["rows"]))
+
+    def test_overdue_when_previous_week_has_no_completion_record(self):
+        start = date.today() - timedelta(weeks=1)
+        with override_settings(CHORE_ROTATION_START_DATE=start):
+            response = self.client.get(reverse("dashboard"))
+
+        self.assertTrue(all(row["overdue"] for row in response.context["rows"]))
+
+    def test_overdue_when_previous_week_marked_not_done(self):
+        start = date.today() - timedelta(weeks=1)
+        with override_settings(CHORE_ROTATION_START_DATE=start):
+            for chore in self.chores:
+                ChoreCompletion.objects.create(chore=chore, week_index=0, done=False)
+            response = self.client.get(reverse("dashboard"))
+
+        self.assertTrue(all(row["overdue"] for row in response.context["rows"]))
+
+    def test_not_overdue_when_previous_week_marked_done(self):
+        start = date.today() - timedelta(weeks=1)
+        with override_settings(CHORE_ROTATION_START_DATE=start):
+            for chore in self.chores:
+                ChoreCompletion.objects.create(chore=chore, week_index=0, done=True)
+            response = self.client.get(reverse("dashboard"))
+
+        self.assertTrue(all(not row["overdue"] for row in response.context["rows"]))
+
+
+class ToggleDoneViewTests(TestCase):
+    def setUp(self):
+        self.chore = Chore.objects.create(name="Dishes", order=1)
+
+    def test_get_is_not_allowed(self):
+        response = self.client.get(reverse("toggle-chore", args=[self.chore.id]))
+        self.assertEqual(response.status_code, 405)
+
+    def test_post_marks_done_then_toggling_again_undoes_it(self):
+        start = date.today()
+        with override_settings(CHORE_ROTATION_START_DATE=start):
+            week = week_index(start, date.today())
+            url = reverse("toggle-chore", args=[self.chore.id])
+
+            response = self.client.post(url)
+            self.assertRedirects(response, reverse("dashboard"))
+            completion = ChoreCompletion.objects.get(chore=self.chore, week_index=week)
+            self.assertTrue(completion.done)
+            self.assertIsNotNone(completion.completed_at)
+
+            self.client.post(url)
+            completion.refresh_from_db()
+            self.assertFalse(completion.done)
+            self.assertIsNone(completion.completed_at)
+
+    def test_post_with_unknown_chore_id_returns_404(self):
+        response = self.client.post(reverse("toggle-chore", args=[999999]))
+        self.assertEqual(response.status_code, 404)
