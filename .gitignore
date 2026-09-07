@@ -9,3 +9,12 @@ build/
 *.sqlite3
 .vscode/
 .idea/
+
+# Python / Django
+venv/
+__pycache__/
+*.pyc
+*.pyo
+db.sqlite3
+staticfiles/
+media/
