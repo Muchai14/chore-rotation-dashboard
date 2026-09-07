@@ -1,7 +1,12 @@
 # Chore Rotation Dashboard
 
+**Live:** https://chore-rotation-dashboard.onrender.com
+
 A shared web dashboard for managing household chores among housemates. No accounts —
 everyone uses the same link and picks their name.
+
+Note: this runs on Render's free tier, so the first load after a period of
+inactivity can take 50+ seconds while the instance spins back up.
 
 ## How it works
 
