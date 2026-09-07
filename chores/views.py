@@ -25,12 +25,20 @@ def dashboard(request):
         for completion in ChoreCompletion.objects.filter(week_index=week, chore__in=chores)
     }
 
+    previous_done_by_chore_id = {}
+    if week > 0:
+        previous_done_by_chore_id = {
+            completion.chore_id: completion.done
+            for completion in ChoreCompletion.objects.filter(week_index=week - 1, chore__in=chores)
+        }
+
     rows = [
         {
             "chore": chore,
             "person": person,
             "done": completions_by_chore_id.get(chore.id, None) is not None
             and completions_by_chore_id[chore.id].done,
+            "overdue": week > 0 and not previous_done_by_chore_id.get(chore.id, False),
         }
         for chore, person in current_assignments(people, chores, start_date, today)
     ]

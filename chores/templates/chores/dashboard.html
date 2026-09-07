@@ -17,6 +17,7 @@
           <th>Chore</th>
           <th>Assigned to</th>
           <th>Done</th>
+          <th>Status</th>
         </tr>
       </thead>
       <tbody>
@@ -29,6 +30,11 @@
               {% csrf_token %}
               <input type="checkbox" {% if row.done %}checked{% endif %} onchange="this.form.submit()">
             </form>
+          </td>
+          <td>
+            {% if row.overdue %}
+              <span style="color: red; font-weight: bold;">OVERDUE</span>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}
