@@ -24,7 +24,12 @@
         <tr>
           <td>{{ row.chore.name }}</td>
           <td>{{ row.person.name }}</td>
-          <td><input type="checkbox" {% if row.done %}checked{% endif %} disabled></td>
+          <td>
+            <form method="post" action="{% url 'toggle-chore' row.chore.id %}">
+              {% csrf_token %}
+              <input type="checkbox" {% if row.done %}checked{% endif %} onchange="this.form.submit()">
+            </form>
+          </td>
         </tr>
         {% endfor %}
       </tbody>

@@ -1,7 +1,9 @@
 from datetime import date
 
 from django.conf import settings
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from .models import Chore, ChoreCompletion, Person
 from .services import current_assignments, week_index
@@ -34,3 +36,17 @@ def dashboard(request):
     ]
 
     return render(request, "chores/dashboard.html", {"week_index": week, "rows": rows})
+
+
+@require_POST
+def toggle_done(request, chore_id):
+    chore = get_object_or_404(Chore, id=chore_id)
+    today = date.today()
+    week = week_index(settings.CHORE_ROTATION_START_DATE, today)
+
+    completion, _ = ChoreCompletion.objects.get_or_create(chore=chore, week_index=week)
+    completion.done = not completion.done
+    completion.completed_at = timezone.now() if completion.done else None
+    completion.save()
+
+    return redirect("dashboard")
